@@ -7,6 +7,12 @@ const RED = "#EF4444";
 const AMBER = "#F59E0B";
 const M = "rgba(255,255,255,0.4)";
 
+// ─── EmailJS Config (à remplir après création du compte) ───
+const EMAILJS_SERVICE_ID = "service_tp9kmv7";
+const EMAILJS_TEMPLATE_ID = "template_kesbevg";
+const EMAILJS_PUBLIC_KEY = "TEqC8Z_fBnAEY3r5g4gyR";
+const DEST_EMAIL = "f790eb77.nekuta.be@emea.teams.ms";
+
 const EPI_LIST = [
   { code: "M003", label: "Antibruit", e: "🎧" },
   { code: "M004", label: "Lunettes", e: "🥽" },
@@ -22,9 +28,7 @@ const EPI_LIST = [
 
 const RISK_CATEGORIES = [
   {
-    id: "prep",
-    icon: "📋",
-    label: "Préparation du travail",
+    id: "prep", icon: "📋", label: "Préparation du travail",
     checks: [
       "Les travaux à effectuer sont-ils soigneusement décrits ?",
       "Chacun sait-il ce que l'on attend de lui ?",
@@ -33,9 +37,7 @@ const RISK_CATEGORIES = [
     ],
   },
   {
-    id: "tranchee",
-    icon: "⚠️",
-    label: "Tranchées & Excavations",
+    id: "tranchee", icon: "⚠️", label: "Tranchées & Excavations",
     checks: [
       "Blindage / étaiement en place ?",
       "Profondeur > 1.2m → échelle d'accès présente ?",
@@ -44,9 +46,7 @@ const RISK_CATEGORIES = [
     ],
   },
   {
-    id: "circulation",
-    icon: "🚧",
-    label: "Circulation & Signalisation",
+    id: "circulation", icon: "🚧", label: "Circulation & Signalisation",
     checks: [
       "Signalisation chantier conforme (panneaux, cônes, barrières) ?",
       "Plan de circulation appliqué ?",
@@ -55,9 +55,7 @@ const RISK_CATEGORIES = [
     ],
   },
   {
-    id: "engins",
-    icon: "🚜",
-    label: "Engins & Machines",
+    id: "engins", icon: "🚜", label: "Engins & Machines",
     checks: [
       "Contrôle journalier de l'engin effectué ?",
       "Zone de travail balisée autour de l'engin ?",
@@ -66,9 +64,7 @@ const RISK_CATEGORIES = [
     ],
   },
   {
-    id: "reseaux",
-    icon: "🔌",
-    label: "Réseaux Souterrains",
+    id: "reseaux", icon: "🔌", label: "Réseaux Souterrains",
     checks: [
       "Plans KLIM / impétrants consultés ?",
       "Détection réseaux effectuée ?",
@@ -77,9 +73,7 @@ const RISK_CATEGORIES = [
     ],
   },
   {
-    id: "epi_check",
-    icon: "🦺",
-    label: "EPI & Équipements",
+    id: "epi_check", icon: "🦺", label: "EPI & Équipements",
     checks: [
       "Chacun dispose-t-il des EPI requis ?",
       "Matériel et EPI en bon état ?",
@@ -88,9 +82,7 @@ const RISK_CATEGORIES = [
     ],
   },
   {
-    id: "env",
-    icon: "🌧️",
-    label: "Environnement & Conditions",
+    id: "env", icon: "🌧️", label: "Environnement & Conditions",
     checks: [
       "Conditions météo acceptables ?",
       "Éclairage suffisant ?",
@@ -123,8 +115,123 @@ const EMERGENCY = [
   { l: "Responsable Nekuta", n: "+32 489 76 49 45", i: "📞" },
 ];
 
+// ─── EMAIL / PDF GENERATION ─────────────────────────────────
+
+function generateEmailHTML(data) {
+  const { info, epis, checks, envD, intR, comment, conscience, signers, ts } = data;
+  const decisionLabel = { go: "GO — TRAVAIL AUTORISÉ ✅", cond: "GO CONDITIONNEL ⚠️", stop: "STOP — TRAVAIL INTERDIT 🛑" }[conscience];
+  const decisionColor = { go: "#22C55E", cond: "#F59E0B", stop: "#EF4444" }[conscience];
+
+  const nokItems = [];
+  RISK_CATEGORIES.forEach(cat => {
+    cat.checks.forEach((ck, i) => {
+      if (checks[`${cat.id}-${i}`] === "nok") nokItems.push(`${cat.icon} ${ck}`);
+    });
+  });
+
+  const epiLabels = epis.map(c => { const e = EPI_LIST.find(x => x.code === c); return e ? `${e.e} ${e.code}` : c; }).join(" · ");
+  const signList = signers.filter(s => s.name && s.signed).map(s => s.name).join(", ");
+
+  return `
+<div style="font-family:Calibri,Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8f9fa;padding:20px;">
+  <div style="background:#1A1A2E;padding:20px 24px;border-radius:12px 12px 0 0;">
+    <h1 style="color:white;margin:0;font-size:20px;letter-spacing:2px;">NEKUTA</h1>
+    <div style="color:#E8611A;font-size:11px;font-weight:700;letter-spacing:3px;margin-top:2px;">LMRA — ARDM</div>
+  </div>
+
+  <div style="background:${decisionColor};padding:16px 24px;color:white;font-size:18px;font-weight:800;text-align:center;">
+    ${decisionLabel}
+  </div>
+
+  <div style="background:white;padding:24px;border:1px solid #eee;">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <tr><td style="padding:6px 0;color:#888;font-size:12px;width:120px;">Lieu</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${info.lieu}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;font-size:12px;">Travail</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${info.travail}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;font-size:12px;">Date & Heure</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${info.date} · ${info.heure}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;font-size:12px;">EPI</td><td style="padding:6px 0;font-size:13px;">${epiLabels}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;font-size:12px;">Signataire(s)</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${signList}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;font-size:12px;">Horodatage</td><td style="padding:6px 0;font-size:13px;">${ts}</td></tr>
+    </table>
+
+    ${nokItems.length > 0 ? `
+    <div style="background:#FEF2F2;border-left:4px solid #EF4444;padding:12px 16px;border-radius:4px;margin-bottom:16px;">
+      <div style="color:#EF4444;font-weight:700;font-size:13px;margin-bottom:8px;">Points NOK (${nokItems.length})</div>
+      ${nokItems.map(item => `<div style="color:#666;font-size:12px;padding:3px 0;">${item}</div>`).join("")}
+    </div>` : ""}
+
+    ${envD.length > 0 || intR.length > 0 ? `
+    <div style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:12px 16px;border-radius:4px;margin-bottom:16px;">
+      <div style="color:#F59E0B;font-weight:700;font-size:13px;margin-bottom:8px;">Dangers & Risques identifiés</div>
+      ${envD.length > 0 ? `<div style="font-size:12px;color:#666;"><b>Environnement :</b> ${envD.join(", ")}</div>` : ""}
+      ${intR.length > 0 ? `<div style="font-size:12px;color:#666;margin-top:4px;"><b>Intervention :</b> ${intR.join(", ")}</div>` : ""}
+    </div>` : ""}
+
+    ${comment ? `
+    <div style="background:#F0FDF4;border-left:4px solid #22C55E;padding:12px 16px;border-radius:4px;margin-bottom:16px;">
+      <div style="color:#22C55E;font-weight:700;font-size:13px;margin-bottom:4px;">Mesures complémentaires</div>
+      <div style="color:#666;font-size:12px;">${comment}</div>
+    </div>` : ""}
+
+    <h3 style="font-size:13px;color:#1A1A2E;margin:16px 0 8px;">Détail des vérifications</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <tr style="background:#f1f5f9;">
+        <th style="text-align:left;padding:6px 8px;color:#888;">Vérification</th>
+        <th style="text-align:center;padding:6px 8px;color:#888;width:50px;">Résultat</th>
+      </tr>
+      ${RISK_CATEGORIES.map(cat => 
+        cat.checks.map((ck, i) => {
+          const v = checks[`${cat.id}-${i}`];
+          const color = v === "ok" ? "#22C55E" : v === "nok" ? "#EF4444" : "#999";
+          const label = v === "ok" ? "OK" : v === "nok" ? "NOK" : "N/A";
+          return `<tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:5px 8px;color:#555;">${cat.icon} ${ck}</td>
+            <td style="padding:5px 8px;text-align:center;color:${color};font-weight:700;">${label}</td>
+          </tr>`;
+        }).join("")
+      ).join("")}
+    </table>
+  </div>
+
+  <div style="background:#1A1A2E;padding:16px 24px;border-radius:0 0 12px 12px;text-align:center;">
+    <div style="color:#E8611A;font-size:10px;font-weight:700;letter-spacing:2px;">NEKUTA — VCA★★</div>
+    <div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px;">Pas de sécurité, pas de travail</div>
+  </div>
+</div>`;
+}
+
+async function sendLMRA(data) {
+  const html = generateEmailHTML(data);
+  const decisionLabel = { go: "GO ✅", cond: "CONDITIONNEL ⚠️", stop: "STOP 🛑" }[data.conscience];
+  const subject = `LMRA — ${data.info.lieu} — ${decisionLabel} — ${data.info.date}`;
+
+  // EmailJS
+  const payload = {
+    service_id: EMAILJS_SERVICE_ID,
+    template_id: EMAILJS_TEMPLATE_ID,
+    user_id: EMAILJS_PUBLIC_KEY,
+    template_params: {
+      to_email: DEST_EMAIL,
+      subject: subject,
+      html_content: html,
+      from_name: "NEKUTA LMRA Digital",
+    },
+  };
+
+  const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) throw new Error("Échec de l'envoi");
+  return true;
+}
+
+// ─── MAIN APP ───────────────────────────────────────────────
+
 export default function App() {
   const [step, setStep] = useState("splash");
+  const [showSOS, setShowSOS] = useState(false);
   const [info, setInfo] = useState({ lieu: "", travail: "", date: new Date().toISOString().slice(0, 10), heure: new Date().toTimeString().slice(0, 5) });
   const [epis, setEpis] = useState([]);
   const [checks, setChecks] = useState({});
@@ -134,8 +241,10 @@ export default function App() {
   const [comment, setComment] = useState("");
   const [conscience, setConscience] = useState(null);
   const [signers, setSigners] = useState([{ name: "", signed: false }]);
-  const [showSOS, setShowSOS] = useState(false);
   const [ts, setTs] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState(null);
   const ref = useRef(null);
 
   useEffect(() => { setTimeout(() => setStep("info"), 2200); }, []);
@@ -157,10 +266,30 @@ export default function App() {
     return "rgba(255,255,255,0.15)";
   };
 
+  const handleSend = async () => {
+    setSending(true);
+    setSendError(null);
+    try {
+      await sendLMRA({ info, epis, checks, envD, intR, comment, conscience, signers, ts });
+      setSent(true);
+    } catch (e) {
+      setSendError("Erreur d'envoi. Vérifiez votre connexion et réessayez.");
+    }
+    setSending(false);
+  };
+
+  const resetAll = () => {
+    setStep("info");
+    setInfo({ lieu: "", travail: "", date: new Date().toISOString().slice(0, 10), heure: new Date().toTimeString().slice(0, 5) });
+    setEpis([]); setChecks({}); setExpanded(null); setEnvD([]); setIntR([]);
+    setComment(""); setConscience(null); setSigners([{ name: "", signed: false }]);
+    setSent(false); setSendError(null);
+  };
+
   // ── SPLASH ──
   if (step === "splash") return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(160deg, ${DARK}, #16213E, ${DARK})`, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-      <style>{`@keyframes p{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}} @keyframes fu{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}} *{box-sizing:border-box;margin:0;padding:0} input,textarea,button{font-family:inherit} ::-webkit-scrollbar{width:0}`}</style>
+      <style>{`@keyframes p{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}} @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} *{box-sizing:border-box;margin:0;padding:0} input,textarea,button{font-family:inherit} ::-webkit-scrollbar{width:0}`}</style>
       <div style={{ width: 76, height: 76, borderRadius: 20, background: `linear-gradient(135deg, ${O}, #FF8A3D)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 20, animation: "p 1.5s ease infinite", boxShadow: `0 0 50px ${O}33` }}>🛡️</div>
       <div style={{ color: "white", fontSize: 22, fontWeight: 800, letterSpacing: 3 }}>NEKUTA</div>
       <div style={{ color: O, fontSize: 11, fontWeight: 700, letterSpacing: 5, marginTop: 4 }}>LMRA DIGITAL</div>
@@ -170,7 +299,7 @@ export default function App() {
 
   return (
     <div ref={ref} style={{ minHeight: "100vh", background: `linear-gradient(170deg, ${DARK}, #131620)`, fontFamily: "'Segoe UI', system-ui, sans-serif", overflowY: "auto" }}>
-      <style>{`@keyframes fu{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}} *{box-sizing:border-box;margin:0;padding:0} input,textarea,button{font-family:inherit} ::-webkit-scrollbar{width:0}`}</style>
+      <style>{`@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;margin:0;padding:0} input,textarea,button{font-family:inherit} ::-webkit-scrollbar{width:0}`}</style>
 
       {/* HEADER */}
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
@@ -186,7 +315,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* SOS PANEL */}
+      {/* SOS */}
       {showSOS && (
         <div style={{ margin: "8px 16px 0", padding: 14, borderRadius: 14, background: `${RED}08`, border: `1px solid ${RED}22`, animation: "fu 0.3s ease" }}>
           <div style={{ color: RED, fontSize: 12, fontWeight: 800, letterSpacing: 1, marginBottom: 10 }}>NUMÉROS D'URGENCE</div>
@@ -200,11 +329,27 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ padding: "16px 16px 100px", animation: "fu 0.4s ease" }}>
+      {/* STEP BAR */}
+      {step !== "summary" && (
+        <div style={{ padding: "16px 16px 0" }}>
+          <div style={{ display: "flex", gap: 2, marginBottom: 16 }}>
+            {["Info", "EPI", "Analyse", "Risques", "Décision"].map((s, i) => {
+              const stepIdx = ["info", "epi", "checks", "risks", "decision"].indexOf(step);
+              return (
+                <div key={s} style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{ height: 3, borderRadius: 2, background: i <= stepIdx ? O : "rgba(255,255,255,0.06)", transition: "all 0.3s", marginBottom: 4 }} />
+                  <div style={{ fontSize: 9, fontWeight: i === stepIdx ? 700 : 400, color: i <= stepIdx ? O : "rgba(255,255,255,0.18)" }}>{s}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-        {/* ═══ STEP: INFO ═══ */}
+      <div style={{ padding: "0 16px 100px", animation: "fu 0.4s ease" }}>
+
+        {/* ═══ INFO ═══ */}
         {step === "info" && (<>
-          <StepBar steps={["Info", "EPI", "Analyse", "Risques", "Décision"]} current={0} />
           <Card title="Identification" sub="Renseignez les infos chantier">
             <Inp label="Lieu de travail" ph="Adresse précise + commune" v={info.lieu} set={v => setInfo(p => ({ ...p, lieu: v }))} />
             <Inp label="Travail à effectuer" ph="Ex : Terrassement, pavage, asphaltage..." v={info.travail} set={v => setInfo(p => ({ ...p, travail: v }))} />
@@ -216,19 +361,16 @@ export default function App() {
           <Btn label="SUIVANT → EPI" dis={!info.lieu || !info.travail} onClick={() => go("epi")} />
         </>)}
 
-        {/* ═══ STEP: EPI ═══ */}
+        {/* ═══ EPI ═══ */}
         {step === "epi" && (<>
-          <StepBar steps={["Info", "EPI", "Analyse", "Risques", "Décision"]} current={1} />
-          <Card title="EPI requis" sub="Sélectionnez les équipements obligatoires pour cette intervention">
+          <Card title="EPI requis" sub="Sélectionnez les équipements obligatoires">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 6, marginTop: 4 }}>
               {EPI_LIST.map(epi => {
                 const a = epis.includes(epi.code);
                 return (
                   <button key={epi.code} onClick={() => setEpis(p => a ? p.filter(c => c !== epi.code) : [...p, epi.code])} style={{
-                    padding: "10px 2px", borderRadius: 10,
-                    border: `2px solid ${a ? O : "rgba(255,255,255,0.05)"}`,
-                    background: a ? `${O}12` : "rgba(255,255,255,0.02)",
-                    cursor: "pointer", textAlign: "center", transition: "all 0.2s",
+                    padding: "10px 2px", borderRadius: 10, border: `2px solid ${a ? O : "rgba(255,255,255,0.05)"}`,
+                    background: a ? `${O}12` : "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "center", transition: "all 0.2s",
                   }}>
                     <div style={{ fontSize: 22 }}>{epi.e}</div>
                     <div style={{ color: a ? O : M, fontSize: 8, fontWeight: 700, marginTop: 2 }}>{epi.code}</div>
@@ -244,26 +386,19 @@ export default function App() {
           </div>
         </>)}
 
-        {/* ═══ STEP: CHECKS ═══ */}
+        {/* ═══ CHECKS ═══ */}
         {step === "checks" && (<>
-          <StepBar steps={["Info", "EPI", "Analyse", "Risques", "Décision"]} current={2} />
-
-          {/* Progress */}
           <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 20, height: 6, marginBottom: 4, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${prog}%`, background: hasNOK ? `linear-gradient(90deg, ${RED}, #FF6B6B)` : `linear-gradient(90deg, ${O}, ${GREEN})`, borderRadius: 20, transition: "all 0.4s" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: M, marginBottom: 14 }}>
-            <span>{done}/{total} vérifications</span>
-            <span>{prog}%</span>
+            <span>{done}/{total} vérifications</span><span>{prog}%</span>
           </div>
-
-          {/* Task badge */}
           <div style={{ background: `${O}10`, border: `1px solid ${O}22`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: 14 }}>📋</span>
             <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}><b style={{ color: O }}>{info.travail}</b> — {info.lieu}</span>
           </div>
 
-          {/* Categories */}
           {RISK_CATEGORIES.map(cat => {
             const open = expanded === cat.id;
             const color = getCatStatus(cat);
@@ -312,11 +447,9 @@ export default function App() {
           </div>
         </>)}
 
-        {/* ═══ STEP: RISKS (dangers + risques tags) ═══ */}
+        {/* ═══ RISKS ═══ */}
         {step === "risks" && (<>
-          <StepBar steps={["Info", "EPI", "Analyse", "Risques", "Décision"]} current={3} />
-
-          <Card title="Dangers de l'environnement" sub="Identifiez les dangers présents sur le lieu de travail">
+          <Card title="Dangers de l'environnement" sub="Identifiez les dangers présents">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
               {ENV_DANGERS.map(d => {
                 const a = envD.includes(d);
@@ -324,9 +457,7 @@ export default function App() {
               })}
             </div>
           </Card>
-
           <div style={{ height: 10 }} />
-
           <Card title="Risques de l'intervention" sub="Identifiez les risques liés à la tâche">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
               {INT_RISKS.map(r => {
@@ -335,37 +466,28 @@ export default function App() {
               })}
             </div>
           </Card>
-
           <div style={{ height: 10 }} />
-
-          <Card title="Mesures complémentaires" sub="Décrivez les mesures prises pour maîtriser les risques identifiés">
-            <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Ex : Balisage renforcé côté circulation, détection réseau effectuée par..."
+          <Card title="Mesures complémentaires" sub="Décrivez les mesures prises">
+            <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Ex : Balisage renforcé côté circulation..."
               style={{ width: "100%", minHeight: 80, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 12, color: "white", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
           </Card>
-
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
             <BtnBack onClick={() => go("checks")} />
             <Btn label="SUIVANT → Décision" onClick={() => go("decision")} />
           </div>
         </>)}
 
-        {/* ═══ STEP: DECISION ═══ */}
+        {/* ═══ DECISION ═══ */}
         {step === "decision" && (<>
-          <StepBar steps={["Info", "EPI", "Analyse", "Risques", "Décision"]} current={4} />
-
-          {/* NOK summary */}
           {hasNOK && (
             <div style={{ background: `${RED}10`, border: `1px solid ${RED}33`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
               <div style={{ color: RED, fontSize: 14, fontWeight: 800, marginBottom: 8 }}>⚠️ {nokCount} point(s) non conforme(s)</div>
               {RISK_CATEGORIES.map(cat => cat.checks.map((ck, i) => checks[`${cat.id}-${i}`] === "nok" ? (
-                <div key={`${cat.id}-${i}`} style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, padding: "4px 0 4px 14px", borderLeft: `2px solid ${RED}`, marginTop: 6 }}>
-                  {cat.icon} {ck}
-                </div>
+                <div key={`${cat.id}-${i}`} style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, padding: "4px 0 4px 14px", borderLeft: `2px solid ${RED}`, marginTop: 6 }}>{cat.icon} {ck}</div>
               ) : null))}
             </div>
           )}
 
-          {/* Identified risks summary */}
           {(envD.length > 0 || intR.length > 0) && (
             <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 16, marginBottom: 14, border: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ color: M, fontSize: 10, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8 }}>RISQUES IDENTIFIÉS</div>
@@ -376,13 +498,12 @@ export default function App() {
             </div>
           )}
 
-          {/* THE question */}
-          <Card title="Puis-je travailler en sécurité ?" sub="Répondez honnêtement — cette question est l'essence même du LMRA">
+          <Card title="Puis-je travailler en sécurité ?" sub="Cette question est l'essence même du LMRA">
             <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
               {[
-                { key: "go", icon: "🟢", label: "OUI — GO", desc: "Tous les risques sont maîtrisés", color: GREEN },
-                { key: "cond", icon: "🟡", label: "OUI — Sous conditions", desc: "Mesures correctives prises", color: AMBER },
-                { key: "stop", icon: "🔴", label: "NON — STOP", desc: "Alerter le responsable", color: RED },
+                { key: "go", icon: "🟢", label: "OUI — GO", desc: "Risques maîtrisés", color: GREEN },
+                { key: "cond", icon: "🟡", label: "Sous conditions", desc: "Mesures prises", color: AMBER },
+                { key: "stop", icon: "🔴", label: "NON — STOP", desc: "Alerter responsable", color: RED },
               ].map(d => (
                 <button key={d.key} onClick={() => setConscience(d.key)} style={{
                   flex: 1, padding: "16px 8px", borderRadius: 12,
@@ -391,17 +512,16 @@ export default function App() {
                   cursor: "pointer", textAlign: "center", transition: "all 0.2s",
                 }}>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>{d.icon}</div>
-                  <div style={{ color: conscience === d.key ? d.color : "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 800 }}>{d.label}</div>
-                  <div style={{ color: M, fontSize: 10, marginTop: 4, lineHeight: 1.3 }}>{d.desc}</div>
+                  <div style={{ color: conscience === d.key ? d.color : "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 800 }}>{d.label}</div>
+                  <div style={{ color: M, fontSize: 9, marginTop: 4 }}>{d.desc}</div>
                 </button>
               ))}
             </div>
           </Card>
 
-          {/* Signature */}
           {conscience && (<>
             <div style={{ height: 10 }} />
-            <Card title="Engagement" sub="« Ayant été informé de ces prescriptions, je m'engage à en respecter les consignes. »">
+            <Card title="Engagement" sub="« Je m'engage à respecter les consignes de sécurité. »">
               {signers.map((s, i) => (
                 <div key={i} style={{ marginBottom: 12, padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
                   <Inp label={`Exécutant ${i + 1}`} ph="Nom & Prénom" v={s.name} set={v => { const n = [...signers]; n[i] = { ...n[i], name: v }; setSigners(n); }} />
@@ -409,33 +529,25 @@ export default function App() {
                     width: "100%", padding: "12px 0", borderRadius: 8,
                     border: `2px solid ${s.signed ? GREEN : "rgba(255,255,255,0.08)"}`,
                     background: s.signed ? `${GREEN}12` : "transparent",
-                    color: s.signed ? GREEN : M,
-                    fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",
-                  }}>
-                    {s.signed ? "✅ Signé" : "Tapez pour signer ✍️"}
-                  </button>
+                    color: s.signed ? GREEN : M, fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.2s",
+                  }}>{s.signed ? "✅ Signé" : "Tapez pour signer ✍️"}</button>
                 </div>
               ))}
               <button onClick={() => setSigners(p => [...p, { name: "", signed: false }])} style={{
-                width: "100%", padding: "10px 0", borderRadius: 8,
-                border: "1px dashed rgba(255,255,255,0.1)", background: "transparent",
-                color: M, fontSize: 12, cursor: "pointer",
+                width: "100%", padding: "10px 0", borderRadius: 8, border: "1px dashed rgba(255,255,255,0.1)",
+                background: "transparent", color: M, fontSize: 12, cursor: "pointer",
               }}>+ Ajouter un exécutant</button>
             </Card>
-
-            <Btn label={conscience === "stop" ? "🛑 CONFIRMER — STOP TRAVAUX" : "✅ VALIDER LE LMRA"} dis={!signValid}
+            <Btn label={conscience === "stop" ? "🛑 CONFIRMER — STOP TRAVAUX" : "✅ VALIDER LE LMRA"}
+              dis={!signValid}
               onClick={() => { setTs(new Date().toLocaleString("fr-BE")); go("summary"); }}
               color={conscience === "stop" ? RED : conscience === "cond" ? AMBER : GREEN} mt={16} />
           </>)}
-
-          <div style={{ marginTop: 16 }}>
-            <BtnBack onClick={() => go("risks")} full />
-          </div>
+          <div style={{ marginTop: 16 }}><BtnBack onClick={() => go("risks")} full /></div>
         </>)}
 
         {/* ═══ SUMMARY ═══ */}
         {step === "summary" && (<>
-          {/* Banner */}
           {(() => {
             const d = { go: { l: "GO — TRAVAIL AUTORISÉ", c: GREEN, i: "✅" }, cond: { l: "GO CONDITIONNEL", c: AMBER, i: "⚠️" }, stop: { l: "STOP — TRAVAIL INTERDIT", c: RED, i: "🛑" } }[conscience];
             return (
@@ -443,7 +555,6 @@ export default function App() {
                 <div style={{ fontSize: 44, marginBottom: 6 }}>{d.i}</div>
                 <div style={{ color: d.c, fontSize: 18, fontWeight: 800, letterSpacing: 1 }}>{d.l}</div>
                 <div style={{ color: M, fontSize: 11, marginTop: 8 }}>{ts}</div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginTop: 4 }}>Pas de sécurité, pas de travail</div>
               </div>
             );
           })()}
@@ -461,9 +572,7 @@ export default function App() {
           <SumCard label="ANALYSE DES RISQUES">
             <SR l="Vérifications" v={`${done}/${total} — ${nokCount} NOK`} />
             {RISK_CATEGORIES.map(cat => cat.checks.map((ck, i) => checks[`${cat.id}-${i}`] === "nok" ? (
-              <div key={`${cat.id}-${i}`} style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, padding: "3px 0 3px 10px", borderLeft: `2px solid ${RED}55`, marginTop: 4 }}>
-                {cat.icon} {ck}
-              </div>
+              <div key={`${cat.id}-${i}`} style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, padding: "3px 0 3px 10px", borderLeft: `2px solid ${RED}55`, marginTop: 4 }}>{cat.icon} {ck}</div>
             ) : null))}
           </SumCard>
 
@@ -481,16 +590,41 @@ export default function App() {
             {signers.filter(s => s.name).map((s, i) => <SR key={i} l={s.name} v={s.signed ? "✅ Signé" : "—"} />)}
           </SumCard>
 
-          <button onClick={() => {
-            setStep("info"); setInfo({ lieu: "", travail: "", date: new Date().toISOString().slice(0, 10), heure: new Date().toTimeString().slice(0, 5) });
-            setEpis([]); setChecks({}); setExpanded(null); setEnvD([]); setIntR([]);
-            setComment(""); setConscience(null); setSigners([{ name: "", signed: false }]);
-          }} style={{ width: "100%", marginTop: 20, padding: "15px 0", borderRadius: 12, border: `1px solid ${O}44`, background: "transparent", color: O, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-            🔄 NOUVEAU LMRA
-          </button>
+          {/* SEND BUTTON */}
+          {!sent ? (
+            <button onClick={handleSend} disabled={sending} style={{
+              width: "100%", marginTop: 16, padding: "16px 0", borderRadius: 12, border: "none",
+              background: sending ? "rgba(255,255,255,0.1)" : `linear-gradient(135deg, #2563EB, #3B82F6)`,
+              color: "white", fontSize: 15, fontWeight: 700, cursor: sending ? "default" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            }}>
+              {sending ? (<>
+                <div style={{ width: 18, height: 18, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                Envoi en cours...
+              </>) : "📤 ENVOYER LE LMRA → Teams VCA"}
+            </button>
+          ) : (
+            <div style={{ marginTop: 16, padding: 20, borderRadius: 14, background: `${GREEN}12`, border: `2px solid ${GREEN}`, textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+              <div style={{ color: GREEN, fontSize: 16, fontWeight: 800 }}>LMRA envoyé avec succès !</div>
+              <div style={{ color: M, fontSize: 12, marginTop: 6 }}>Le rapport a été transmis au canal VCA Teams</div>
+            </div>
+          )}
+
+          {sendError && (
+            <div style={{ marginTop: 10, padding: 14, borderRadius: 10, background: `${RED}12`, border: `1px solid ${RED}33`, color: RED, fontSize: 13, textAlign: "center" }}>
+              {sendError}
+            </div>
+          )}
+
+          <button onClick={resetAll} style={{
+            width: "100%", marginTop: 16, padding: "15px 0", borderRadius: 12,
+            border: `1px solid ${O}44`, background: "transparent", color: O,
+            fontSize: 14, fontWeight: 700, cursor: "pointer",
+          }}>🔄 NOUVEAU LMRA</button>
 
           <div style={{ textAlign: "center", color: "rgba(255,255,255,0.12)", fontSize: 9, marginTop: 28, lineHeight: 1.8 }}>
-            NEKUTA LMRA Digital v3.0 — VCA★★<br />Responsable : Hahati Mohamed<br />info@nekuta.be · +32 489 76 49 45
+            NEKUTA LMRA Digital v4.0 — VCA★★<br />Responsable : Hahati Mohamed<br />info@nekuta.be · +32 489 76 49 45
           </div>
         </>)}
       </div>
@@ -498,20 +632,8 @@ export default function App() {
   );
 }
 
-// ── SMALL COMPONENTS ──
+// ── COMPONENTS ──
 
-function StepBar({ steps, current }) {
-  return (
-    <div style={{ display: "flex", gap: 2, marginBottom: 16 }}>
-      {steps.map((s, i) => (
-        <div key={s} style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ height: 3, borderRadius: 2, background: i <= current ? O : "rgba(255,255,255,0.06)", transition: "all 0.3s", marginBottom: 4 }} />
-          <div style={{ fontSize: 9, fontWeight: i === current ? 700 : 400, color: i <= current ? O : "rgba(255,255,255,0.18)", letterSpacing: 0.3 }}>{s}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
 function Card({ title, sub, children }) {
   return (
     <div style={{ background: "#181B24", borderRadius: 14, padding: 18, border: "1px solid rgba(255,255,255,0.05)" }}>
@@ -527,8 +649,7 @@ function Inp({ label, ph, v, set, type = "text" }) {
       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>{label}</div>
       <input type={type} placeholder={ph} value={v} onChange={e => set(e.target.value)}
         style={{ width: "100%", padding: "12px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, color: "white", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-        onFocus={e => e.target.style.borderColor = `${O}55`}
-        onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.07)"} />
+        onFocus={e => e.target.style.borderColor = `${O}55`} onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.07)"} />
     </div>
   );
 }
